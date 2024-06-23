@@ -7,14 +7,15 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 
 public class App {
+
   public static List<String> searchExcelFile(String filePath, String searchString) {
     List<String> cellAddresses = new ArrayList<>();
     File targetFile = new File(filePath);
@@ -25,19 +26,10 @@ public class App {
       for (Sheet sheet : workbook) {
         for (Row row : sheet) {
           for (Cell cell : row) {
-            if (cell.getCellType() == CellType.STRING) {
-              String cellValue = cell.getStringCellValue();
-              if (cellValue.contains(searchString)) {
-                String cellAddress =
-                    targetFile.getAbsolutePath()
-                        + " : "
-                        + sheet.getSheetName()
-                        + "!"
-                        + cell.getAddress().formatAsString()
-                        + " : "
-                        + cellValue;
-                cellAddresses.add(cellAddress);
-              }
+            String cellValue = getCellValueAsString(cell);
+            if (cellValue != null && cellValue.contains(searchString)) {
+              String cellAddress = formatCellAddress(targetFile, sheet, cell, cellValue);
+              cellAddresses.add(cellAddress);
             }
           }
         }
@@ -50,6 +42,31 @@ public class App {
     return cellAddresses;
   }
 
+  private static String getCellValueAsString(Cell cell) {
+    switch (cell.getCellType()) {
+      case FORMULA:
+        return cell.getCellFormula();
+      case STRING:
+        return cell.getStringCellValue();
+      case NUMERIC:
+        return String.valueOf(cell.getNumericCellValue());
+      case BOOLEAN:
+        return String.valueOf(cell.getBooleanCellValue());
+      default:
+        return null;
+    }
+  }
+
+  private static String formatCellAddress(
+      File targetFile, Sheet sheet, Cell cell, String cellValue) {
+    return String.format(
+        "%s : %s!%s : %s",
+        targetFile.getAbsolutePath(),
+        sheet.getSheetName(),
+        cell.getAddress().formatAsString(),
+        cellValue);
+  }
+
   public static List<String> searchInDirectory(String directoryPath, String searchString) {
     List<String> results = new ArrayList<>();
 
@@ -58,9 +75,9 @@ public class App {
           .filter(Files::isRegularFile)
           .filter(
               path ->
-                  (path.toString().endsWith(".xlsx")
-                          || path.toString().endsWith(".xls")
-                          || path.toString().endsWith(".xlsm"))
+                  Files.isRegularFile(path)
+                      && Files.isReadable(path)
+                      && path.toString().matches(".*\\.(xlsx|xls|xlsm)$")
                       && !path.toString().contains("~$"))
           .forEach(
               path -> {
@@ -89,9 +106,7 @@ public class App {
     if (results.isEmpty()) {
       System.out.println("No cells found containing the specified string.");
     } else {
-      for (String result : results) {
-        System.out.println(result);
-      }
+      results.stream().sorted().forEach(System.out::println);
     }
   }
 }
