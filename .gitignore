@@ -6,3 +6,6 @@ build
 
 .settings
 bin
+.metadata
+files
+Servers
